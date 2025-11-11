@@ -1,0 +1,18 @@
+---
+source: src/contacts.rs
+expression: summary
+---
+total_contacts: 3
+contacts:
+  - has_given_name: true
+    has_family_name: true
+    phone_count: 0
+    email_count: 0
+  - has_given_name: true
+    has_family_name: true
+    phone_count: 1
+    email_count: 0
+  - has_given_name: true
+    has_family_name: false
+    phone_count: 1
+    email_count: 0
