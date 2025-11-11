@@ -152,10 +152,10 @@ mod tests {
 
     #[test]
     fn test_normalize_number() {
-        // Test various input formats
+        // Test various input formats with fictional 555 numbers (555-01xx series reserved for testing)
         assert_eq!(
             normalize_number("555-555-0100"),
-            Some("+15555550107".to_string())
+            Some("+15555550100".to_string())
         );
         assert_eq!(
             normalize_number("(555) 555-0101"),
@@ -198,11 +198,11 @@ mod tests {
         // Test with extra characters
         assert_eq!(
             normalize_number("+1 (555) 555-0108"),
-            Some("+15555550107".to_string())
+            Some("+15555550108".to_string())
         );
         assert_eq!(
-            normalize_number("1-555-555-0100"),
-            Some("+15555550107".to_string())
+            normalize_number("1-555-555-0109"),
+            Some("+15555550109".to_string())
         );
     }
 }
