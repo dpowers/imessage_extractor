@@ -48,6 +48,22 @@ cargo run -- --chat "Work Team" --start-date 2024-01-01 --output-directory outpu
 
 ## Known Limitations
 
+### Direct Message Conversations May Be Split
+
+In some cases, direct/SMS conversations may appear as separate files in the output:
+- One file with messages you sent
+- One file with messages you received
+
+**Why this happens:**
+The iMessage database stores outgoing and incoming direct messages with **different `chat_id` values**. The database doesn't expose a reliable "destination" or "participant" field that would allow us to determine that these messages belong to the same conversation.
+
+**What you'll see:**
+- Multiple "Direct:" conversation files for the same person
+- Each file shows only one direction of the conversation
+
+**Workaround:**
+If the conversation also exists as a named group chat (even if it's just the two of you), that version will have both sides of the conversation correctly merged.
+
 ### Message Direction in Some Conversations
 
 In rare cases, you may encounter conversations where all messages appear to be from the other person, with none showing as sent by you. This is a **database issue** in the iMessage `chat.db` file itself, where the `is_from_me` field is incorrectly set to `0` (false) for all messages in certain conversation threads.
