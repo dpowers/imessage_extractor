@@ -40,31 +40,71 @@ impl HtmlOutput {
 
     fn group_messages_by_chat(&self) -> HashMap<String, Vec<&CleanMessage>> {
         let mut grouped: HashMap<String, Vec<&CleanMessage>> = HashMap::new();
-        let mut chat_id_to_name: HashMap<i32, String> = HashMap::new();
 
+        // First pass: collect all chat_ids that are used for direct messages (no chat name)
+        let mut direct_chat_ids: std::collections::HashSet<i32> = std::collections::HashSet::new();
+        for message in &self.messages {
+            if message.chat_name.is_none() {
+                if let Some(chat_id) = message.chat_id {
+                    direct_chat_ids.insert(chat_id);
+                }
+            }
+        }
+
+        // Second pass: for each direct chat_id, find all unique participants (excluding "Me")
+        let mut chat_id_to_participants: HashMap<i32, Vec<String>> = HashMap::new();
+        for chat_id in &direct_chat_ids {
+            let mut participants: Vec<String> = self
+                .messages
+                .iter()
+                .filter(|m| m.chat_id == Some(*chat_id))
+                .map(|m| m.from.to_string())
+                .filter(|name| name != "Me")
+                .collect();
+            participants.sort();
+            participants.dedup();
+            chat_id_to_participants.insert(*chat_id, participants);
+        }
+
+        // Third pass: create a mapping from participant set to canonical chat key
+        let mut participant_set_to_key: HashMap<Vec<String>, String> = HashMap::new();
+        for (_chat_id, participants) in &chat_id_to_participants {
+            if !participants.is_empty() {
+                participant_set_to_key
+                    .entry(participants.clone())
+                    .or_insert_with(|| {
+                        if participants.len() == 1 {
+                            format!("Direct: {}", participants[0])
+                        } else {
+                            format!("Direct: {}", participants.join(", "))
+                        }
+                    });
+            }
+        }
+
+        // Fourth pass: group messages using participant-based keys for direct messages
         for message in &self.messages {
             let chat_key = match &message.chat_name {
                 Some(name) => name.clone(),
                 None => {
-                    // For direct messages without a chat name, use chat_id to group
+                    // For direct messages, find participants and use that as the key
                     if let Some(chat_id) = message.chat_id {
-                        // Get or create a name for this chat_id
-                        chat_id_to_name
-                            .entry(chat_id)
-                            .or_insert_with(|| {
-                                // Find the first non-"Me" participant in this chat
-                                self.messages
-                                    .iter()
-                                    .filter(|m| m.chat_id == Some(chat_id))
-                                    .map(|m| m.from.to_string())
-                                    .find(|name| name != "Me")
-                                    .map(|name| format!("Direct: {}", name))
-                                    .unwrap_or_else(|| format!("Direct: Unknown ({})", chat_id))
-                            })
-                            .clone()
+                        if let Some(participants) = chat_id_to_participants.get(&chat_id) {
+                            if let Some(key) = participant_set_to_key.get(participants) {
+                                key.clone()
+                            } else {
+                                format!("Direct: Unknown ({})", chat_id)
+                            }
+                        } else {
+                            format!("Direct: Unknown ({})", chat_id)
+                        }
                     } else {
-                        // Fallback if no chat_id is available
-                        format!("Direct: {}", message.from)
+                        // Fallback for messages with no chat_id
+                        if message.from.to_string() != "Me" {
+                            format!("Direct: {}", message.from)
+                        } else {
+                            "Direct: Unknown".to_string()
+                        }
                     }
                 }
             };
