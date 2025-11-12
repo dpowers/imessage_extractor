@@ -40,11 +40,33 @@ impl HtmlOutput {
 
     fn group_messages_by_chat(&self) -> HashMap<String, Vec<&CleanMessage>> {
         let mut grouped: HashMap<String, Vec<&CleanMessage>> = HashMap::new();
+        let mut chat_id_to_name: HashMap<i32, String> = HashMap::new();
 
         for message in &self.messages {
             let chat_key = match &message.chat_name {
                 Some(name) => name.clone(),
-                None => format!("Direct: {}", message.from),
+                None => {
+                    // For direct messages without a chat name, use chat_id to group
+                    if let Some(chat_id) = message.chat_id {
+                        // Get or create a name for this chat_id
+                        chat_id_to_name
+                            .entry(chat_id)
+                            .or_insert_with(|| {
+                                // Find the first non-"Me" participant in this chat
+                                self.messages
+                                    .iter()
+                                    .filter(|m| m.chat_id == Some(chat_id))
+                                    .map(|m| m.from.to_string())
+                                    .find(|name| name != "Me")
+                                    .map(|name| format!("Direct: {}", name))
+                                    .unwrap_or_else(|| format!("Direct: Unknown ({})", chat_id))
+                            })
+                            .clone()
+                    } else {
+                        // Fallback if no chat_id is available
+                        format!("Direct: {}", message.from)
+                    }
+                }
             };
 
             grouped.entry(chat_key).or_default().push(message);
@@ -670,28 +692,50 @@ impl HtmlOutput {
                     if let Some(filename) = attachment.filename() {
                         let attachment_subpath = self.get_attachment_path(&message.guid);
                         let attachment_path =
-                            format!("attachments/{}/{}", attachment_subpath, filename);
+                            format!("../attachments/{}/{}", attachment_subpath, filename);
 
-                        // Check if it's an image
-                        if self.is_image_file(filename) {
-                            html.push_str(&format!(
-                                r#"            <img src="{}" alt="{}" class="attachment-image">
+                        // Use MIME type to determine how to display the attachment
+                        use imessage_database::tables::attachment::MediaType;
+                        match attachment.mime_type() {
+                            MediaType::Image(_) => {
+                                html.push_str(&format!(
+                                    r#"            <img src="{}" alt="{}" class="attachment-image">
 "#,
-                                attachment_path,
-                                self.html_escape(filename)
-                            ));
-                        } else {
-                            // For other files, create a download link
-                            let icon = self.get_file_icon(filename);
-                            html.push_str(&format!(
-                                r#"            <a href="{}" class="attachment-link" download>
+                                    attachment_path,
+                                    self.html_escape(filename)
+                                ));
+                            }
+                            MediaType::Video(_) => {
+                                html.push_str(&format!(
+                                    r#"            <video src="{}" controls class="attachment-image">
+                Your browser does not support the video tag.
+            </video>
+"#,
+                                    attachment_path
+                                ));
+                            }
+                            MediaType::Audio(_) => {
+                                html.push_str(&format!(
+                                    r#"            <audio src="{}" controls class="attachment-link">
+                Your browser does not support the audio tag.
+            </audio>
+"#,
+                                    attachment_path
+                                ));
+                            }
+                            _ => {
+                                // For other files (text, application, other), create a download link
+                                let icon = self.get_file_icon(filename);
+                                html.push_str(&format!(
+                                    r#"            <a href="{}" class="attachment-link" download>
                 <span class="attachment-icon">{}</span>{}
             </a>
 "#,
-                                attachment_path,
-                                icon,
-                                self.html_escape(filename)
-                            ));
+                                    attachment_path,
+                                    icon,
+                                    self.html_escape(filename)
+                                ));
+                            }
                         }
                     }
                 }
@@ -756,17 +800,6 @@ impl HtmlOutput {
             .replace('>', "&gt;")
             .replace('"', "&quot;")
             .replace('\'', "&#39;")
-    }
-
-    fn is_image_file(&self, filename: &str) -> bool {
-        let lower = filename.to_lowercase();
-        lower.ends_with(".jpg")
-            || lower.ends_with(".jpeg")
-            || lower.ends_with(".png")
-            || lower.ends_with(".gif")
-            || lower.ends_with(".webp")
-            || lower.ends_with(".heic")
-            || lower.ends_with(".heif")
     }
 
     fn get_file_icon(&self, filename: &str) -> &str {
