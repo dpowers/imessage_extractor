@@ -330,9 +330,9 @@ dependencies = [
 
 [[package]]
 name = "imessage-database"
-version = "3.1.0"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f90daf551bd0d0606baf73cad6ef45c7cfbf0fba40cf34f917fac75ec79c567"
+checksum = "c7f4a463f917185c851c5b917ad8aaecd27b4727255ea30ddbdf71f1b8a75209"
 dependencies = [
  "base64",
  "chrono",

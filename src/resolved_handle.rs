@@ -39,6 +39,10 @@ impl ResolvedHandle {
                 ResolvedHandle::resolve_handle_to_name(&handle_id, handle_cache, contact_map),
             )
         } else {
+            // When is_from_me is false but handle_id is None, this might be a bug
+            // in the database where messages from me aren't properly marked.
+            // In this case, we'll mark it as from an unknown sender rather than
+            // incorrectly assuming it's from me.
             (-1, "Unknown".to_owned())
         };
 
