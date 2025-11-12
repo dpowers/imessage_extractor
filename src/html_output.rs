@@ -90,7 +90,17 @@ impl HtmlOutput {
                     .max()
                     .expect("No messages in chat");
                 let is_group = !chat_key.starts_with("Direct: ");
-                (chat_key, message_count, latest_date, is_group)
+
+                // Collect unique participants (excluding "Me")
+                let mut participants: Vec<String> = messages
+                    .iter()
+                    .map(|m| m.from.to_string())
+                    .filter(|name| name != "Me")
+                    .collect();
+                participants.sort();
+                participants.dedup();
+
+                (chat_key, message_count, latest_date, is_group, participants)
             })
             .collect();
 
@@ -209,6 +219,13 @@ impl HtmlOutput {
             justify-content: space-between;
         }}
 
+        .chat-members {{
+            font-size: 0.85em;
+            color: #888;
+            margin-top: 4px;
+            font-style: italic;
+        }}
+
         .message-count {{
             color: #007aff;
         }}
@@ -239,20 +256,35 @@ impl HtmlOutput {
 "#,
             );
 
-            for (chat_key, message_count, latest_date, _) in group_chats {
+            for (chat_key, message_count, latest_date, _, participants) in group_chats {
                 let filename = format!("groups/{}.html", self.sanitize_filename(chat_key));
+                let members_str = participants.join(", ");
+                let search_text = format!("{} {}", chat_key, members_str).to_lowercase();
+
                 html.push_str(&format!(
                     r#"        <a href="{}" class="chat-item" data-search="{}">
             <div class="chat-name">{}</div>
-            <div class="chat-info">
+"#,
+                    filename,
+                    self.html_escape(&search_text),
+                    self.html_escape(chat_key)
+                ));
+
+                if !participants.is_empty() {
+                    html.push_str(&format!(
+                        r#"            <div class="chat-members">{}</div>
+"#,
+                        self.html_escape(&members_str)
+                    ));
+                }
+
+                html.push_str(&format!(
+                    r#"            <div class="chat-info">
                 <span class="message-count">{} messages</span>
                 <span class="latest-date">{}</span>
             </div>
         </a>
 "#,
-                    filename,
-                    self.html_escape(chat_key).to_lowercase(),
-                    self.html_escape(chat_key),
                     message_count,
                     latest_date.format("%b %d, %Y")
                 ));
@@ -272,22 +304,37 @@ impl HtmlOutput {
 "#,
             );
 
-            for (chat_key, message_count, latest_date, _) in direct_chats {
+            for (chat_key, message_count, latest_date, _, participants) in direct_chats {
                 let filename = format!("direct/{}.html", self.sanitize_filename(chat_key));
                 // Remove "Direct: " prefix for display
                 let display_name = chat_key.strip_prefix("Direct: ").unwrap_or(chat_key);
+                let members_str = participants.join(", ");
+                let search_text = format!("{} {}", display_name, members_str).to_lowercase();
+
                 html.push_str(&format!(
                     r#"        <a href="{}" class="chat-item" data-search="{}">
             <div class="chat-name">{}</div>
-            <div class="chat-info">
+"#,
+                    filename,
+                    self.html_escape(&search_text),
+                    self.html_escape(display_name)
+                ));
+
+                if !participants.is_empty() {
+                    html.push_str(&format!(
+                        r#"            <div class="chat-members">{}</div>
+"#,
+                        self.html_escape(&members_str)
+                    ));
+                }
+
+                html.push_str(&format!(
+                    r#"            <div class="chat-info">
                 <span class="message-count">{} messages</span>
                 <span class="latest-date">{}</span>
             </div>
         </a>
 "#,
-                    filename,
-                    self.html_escape(display_name).to_lowercase(),
-                    self.html_escape(display_name),
                     message_count,
                     latest_date.format("%b %d, %Y")
                 ));
